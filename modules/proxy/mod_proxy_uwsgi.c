@@ -105,6 +105,7 @@ static int uwsgi_send(proxy_conn_rec * conn, const char *buf,
     apr_size_t written;
 
     while (length > 0) {
+        ap_log_rdata(APLOG_MARK, APLOG_ERR, r, "uwsgi_send", buf, length, 0);
         written = length;
         if ((rv = apr_socket_send(conn->sock, buf, &written)) != APR_SUCCESS) {
             ap_log_rerror(APLOG_MARK, APLOG_ERR, rv, r, APLOGNO(10098)
@@ -386,6 +387,7 @@ static int uwsgi_response(request_rec *r, proxy_conn_rec * backend,
         apr_brigade_cleanup(bb);
         rv = ap_get_brigade(rp->input_filters, bb,
                             AP_MODE_READBYTES, mode, conf->io_buffer_size);
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO(10100), "rv is %d", rv);
         if (APR_STATUS_IS_EAGAIN(rv)
             || (rv == APR_SUCCESS && APR_BRIGADE_EMPTY(bb))) {
             e = apr_bucket_flush_create(c->bucket_alloc);
