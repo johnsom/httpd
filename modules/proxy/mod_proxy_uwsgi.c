@@ -105,6 +105,7 @@ static int uwsgi_send(proxy_conn_rec * conn, const char *buf,
     apr_size_t written;
 
     while (length > 0) {
+        ap_log_rdata(APLOG_MARK, APLOG_ERR, r, "uwsgi_send", buf, length, 0);
         written = length;
         if ((rv = apr_socket_send(conn->sock, buf, &written)) != APR_SUCCESS) {
             ap_log_rerror(APLOG_MARK, APLOG_ERR, rv, r, APLOGNO(10098)
@@ -379,21 +380,29 @@ static int uwsgi_response(request_rec *r, proxy_conn_rec * backend,
     while (!finish) {
         rv = ap_get_brigade(rp->input_filters, bb,
                             AP_MODE_READBYTES, mode, conf->io_buffer_size);
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "rv is %d", rv);
+        if (APR_BRIGADE_EMPTY(bb)) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "BRIGADE EMPTY");
+        }
         if (APR_STATUS_IS_EAGAIN(rv)
             || (rv == APR_SUCCESS && APR_BRIGADE_EMPTY(bb))) {
             e = apr_bucket_flush_create(c->bucket_alloc);
             APR_BRIGADE_INSERT_TAIL(bb, e);
             if (ap_pass_brigade(r->output_filters, bb) || c->aborted) {
+                ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "break 1");
                 break;
             }
             apr_brigade_cleanup(bb);
             mode = APR_BLOCK_READ;
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "continue 1");
             continue;
         }
         else if (rv == APR_EOF) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "APR_EOF");
             break;
         }
         else if (rv != APR_SUCCESS) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "Not APR_SUCCESS");
             ap_proxy_backend_broke(r, bb);
             ap_pass_brigade(r->output_filters, bb);
             backend_broke = 1;
@@ -405,6 +414,7 @@ static int uwsgi_response(request_rec *r, proxy_conn_rec * backend,
         backend->worker->s->read += readbytes;
 
         if (APR_BRIGADE_EMPTY(bb)) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "BRIGADE EMPTY break");
             apr_brigade_cleanup(bb);
             break;
         }
@@ -412,8 +422,10 @@ static int uwsgi_response(request_rec *r, proxy_conn_rec * backend,
         ap_proxy_buckets_lifetime_transform(r, bb, pass_bb);
 
         /* found the last brigade? */
-        if (APR_BUCKET_IS_EOS(APR_BRIGADE_LAST(bb)))
+        if (APR_BUCKET_IS_EOS(APR_BRIGADE_LAST(bb))) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "last brigade");
             finish = 1;
+        }
 
         /* do not pass chunk if it is zero_sized */
         apr_brigade_length(pass_bb, 0, &readbytes);
@@ -421,6 +433,7 @@ static int uwsgi_response(request_rec *r, proxy_conn_rec * backend,
         if ((readbytes > 0
              && ap_pass_brigade(r->output_filters, pass_bb) != APR_SUCCESS)
             || c->aborted) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "read bytes finish 1");
             finish = 1;
         }
 
@@ -435,6 +448,7 @@ static int uwsgi_response(request_rec *r, proxy_conn_rec * backend,
     apr_brigade_cleanup(bb);
 
     if (c->aborted || backend_broke) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "return DONE");
         return DONE;
     }
 

@@ -2849,6 +2849,8 @@ PROXY_DECLARE(apr_status_t) ap_proxy_check_connection(const char *scheme,
                 rv = APR_SUCCESS;
             }
             else {
+                ap_log_error(APLOG_MARK, APLOG_ERR, 0, server, APLOGNO(99999)
+                              "ap_proxy_check_connection EPIPE");
                 rv = APR_EPIPE;
             }
         }
@@ -2856,6 +2858,8 @@ PROXY_DECLARE(apr_status_t) ap_proxy_check_connection(const char *scheme,
     else if (conn->sock) {
         /* For modules working with sockets directly, check it. */
         if (!ap_proxy_is_socket_connected(conn->sock)) {
+            ap_log_error(APLOG_MARK, APLOG_ERR, 0, server, APLOGNO(99999)
+                         "ap_proxy_check_connection sock EPIPE");
             rv = APR_EPIPE;
         }
     }
@@ -3983,6 +3987,8 @@ PROXY_DECLARE(apr_status_t) ap_proxy_transfer_between_connections(
                             APR_NONBLOCK_READ, bsize);
         if (rv == APR_SUCCESS) {
             if (c_o->aborted) {
+                ap_log_rerror(APLOG_MARK, APLOG_ERR, rv, r, APLOGNO(03307)
+                              "ap_proxy_transfer_between_connections EPIPE");
                 return APR_EPIPE;
             }
             if (APR_BRIGADE_EMPTY(bb_i)) {
